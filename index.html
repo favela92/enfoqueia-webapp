@@ -178,14 +178,12 @@
             const appNotification = document.getElementById('app-notification');
             const userIdContainer = document.getElementById('user-id-container');
             
-            // Formularios y botones de login
             const loginForm = document.getElementById('login-form');
             const registerButton = document.getElementById('register-button');
             const demoLoginButton = document.getElementById('demo-login-button');
             const logoutButton = document.getElementById('logout-button');
             const loginError = document.getElementById('login-error');
 
-            // Formularios de la app principal
             const taskForm = document.getElementById('task-form');
             const taskInput = document.getElementById('task-input');
             const taskList = document.getElementById('task-list');
@@ -194,7 +192,6 @@
             const siteInput = document.getElementById('site-input');
             const siteList = document.getElementById('site-list');
             
-            // Modal de Gemini
             const geminiModal = document.getElementById('gemini-modal');
             const modalBody = document.getElementById('modal-body');
             const closeModalBtn = document.getElementById('close-modal-btn');
@@ -222,7 +219,6 @@
                 }
             });
             
-            // --- CÓDIGO DE AUTENTICACIÓN RESTAURADO ---
             loginForm.addEventListener('submit', async e => {
                 e.preventDefault();
                 loginError.textContent = '';
@@ -282,7 +278,6 @@
                 }
             }
 
-
             function loadUserData(userId) {
                 appNotification.innerHTML = '';
                 mainContent.classList.remove('hidden');
@@ -304,36 +299,29 @@
 
                 const tasksRef = collection(db, "users", userId, "tasks");
                 
-                // Escuchar TAREAS PENDIENTES
                 const pendingTasksQuery = query(tasksRef, where("completed", "==", false), orderBy("createdAt", "asc"));
                 tasksUnsubscribe = onSnapshot(pendingTasksQuery, snapshot => {
                     taskList.innerHTML = '';
-                    if (snapshot.empty) {
-                        taskList.innerHTML = `<li class="text-slate-400 text-sm text-center py-2">¡Añade un nuevo objetivo para empezar!</li>`;
-                    }
+                    if (snapshot.empty) taskList.innerHTML = `<li class="text-slate-400 text-sm text-center py-2">¡Añade un nuevo objetivo para empezar!</li>`;
                     snapshot.forEach(doc => renderTask(doc.id, doc.data()));
                 }, handleFirestoreError);
 
-                // Escuchar TAREAS COMPLETADAS
                 const completedTasksQuery = query(tasksRef, where("completed", "==", true), orderBy("completedAt", "desc"));
                 completedTasksUnsubscribe = onSnapshot(completedTasksQuery, snapshot => {
                     completedTaskList.innerHTML = '';
-                    if (snapshot.empty) {
-                        completedTaskList.innerHTML = `<li class="text-slate-400 text-sm text-center py-2">Aún no has completado ningún objetivo hoy.</li>`;
-                    }
+                    if (snapshot.empty) completedTaskList.innerHTML = `<li class="text-slate-400 text-sm text-center py-2">Aún no has completado ningún objetivo hoy.</li>`;
                     snapshot.forEach(doc => renderCompletedTask(doc.id, doc.data()));
                 }, handleFirestoreError);
 
-                // Escuchar Sitios a Bloquear
                 const sitesRef = collection(db, "users", userId, "sites");
                 sitesUnsubscribe = onSnapshot(sitesRef, snapshot => {
                     siteList.innerHTML = '';
-                    if (snapshot.empty) {
-                        siteList.innerHTML = `<li class="text-slate-400 text-sm text-center py-2">Añade un sitio que te distraiga.</li>`;
-                    }
+                    if (snapshot.empty) siteList.innerHTML = `<li class="text-slate-400 text-sm text-center py-2">Añade un sitio que te distraiga.</li>`;
                     snapshot.forEach(doc => renderSite(doc.id, doc.data()));
                 }, handleFirestoreError);
             }
+
+            taskForm.addEventListener('submit', e => { e.preventDefault(); addTask(); });
 
             async function addTask(taskNameOverride = null) {
                 const taskName = taskNameOverride || taskInput.value.trim();
@@ -366,18 +354,12 @@
                 }
             });
 
-
             async function completeTask(taskId) {
                 if (!currentUserId || !taskId) return;
                 const taskRef = doc(db, "users", currentUserId, "tasks", taskId);
                 try {
-                    await updateDoc(taskRef, {
-                        completed: true,
-                        completedAt: new Date()
-                    });
-                } catch (error) {
-                    console.error("Error al completar la tarea:", error);
-                }
+                    await updateDoc(taskRef, { completed: true, completedAt: new Date() });
+                } catch (error) { console.error("Error al completar la tarea:", error); }
             }
             
             async function deleteTask(taskId) {
@@ -385,11 +367,8 @@
                 const taskRef = doc(db, "users", currentUserId, "tasks", taskId);
                 try {
                     await deleteDoc(taskRef);
-                } catch (error) {
-                    console.error("Error al eliminar la tarea:", error);
-                }
+                } catch (error) { console.error("Error al eliminar la tarea:", error); }
             }
-
 
             function renderTask(id, data) {
                 const li = document.createElement('li');
@@ -412,23 +391,19 @@
                     taskList.appendChild(li);
                     li.querySelector('.complete-task-btn').addEventListener('click', e => completeTask(e.currentTarget.dataset.id));
                     li.querySelector('.delete-task-btn').addEventListener('click', e => deleteTask(e.currentTarget.dataset.id));
-                    // Falta listener de gemini-btn, lo añadiremos
+                    li.querySelector('.gemini-btn').addEventListener('click', e => showGeminiModal(e.currentTarget.dataset.taskName));
                 }
             }
             
             function renderCompletedTask(id, data) {
                 const li = document.createElement('li');
                 li.className = 'flex items-center bg-slate-100 p-3 rounded-lg task-completed';
-                li.innerHTML = `
-                    <span>${data.name}</span>
-                `;
-                if (completedTaskList) {
-                    completedTaskList.appendChild(li);
-                }
+                li.innerHTML = `<span>${data.name}</span>`;
+                if (completedTaskList) completedTaskList.appendChild(li);
             }
 
             function renderSite(id, data) {
-                 const li = document.createElement('li');
+                const li = document.createElement('li');
                 li.className = 'flex items-center justify-between bg-slate-100 p-3 rounded-lg';
                 li.innerHTML = `<span class="flex-grow font-mono text-sm">${data.url}</span><button data-id="${id}" class="delete-site-btn text-slate-400 hover:text-red-500 transition-colors p-1"><i class="ph ph-trash"></i></button>`;
                 if (siteList) {
@@ -440,8 +415,82 @@
                 }
             }
             
-            // ... (código del modal sin cambios) ...
+            // --- CÓDIGO DE MODAL Y GEMINI RESTAURADO ---
+            closeModalBtn.addEventListener('click', () => {
+                geminiModal.classList.add('hidden');
+                document.body.classList.remove('modal-active');
+            });
 
+            function showGeminiModal(taskName) {
+                geminiModal.classList.remove('hidden');
+                document.body.classList.add('modal-active');
+                modalBody.innerHTML = `
+                    <p class="mb-2">Analizando cómo desglosar: "<strong>${taskName}</strong>"</p>
+                    <div class="flex items-center justify-center py-4">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
+                    </div>
+                `;
+                getTaskBreakdown(taskName);
+            }
+
+            async function getTaskBreakdown(taskName) {
+                const prompt = `Desglosa el siguiente objetivo en 3 a 5 sub-tareas o pasos concretos y accionables. Responde únicamente con la lista de sub-tareas, cada una en una nueva línea, sin numeración ni guiones. Objetivo: "${taskName}"`;
+                
+                const apiKey = ""; // Canvas lo proporciona en runtime
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                    });
+                    
+                    if (!response.ok) throw new Error(`API error: ${response.statusText}`);
+
+                    const result = await response.json();
+                    
+                    if (result.candidates && result.candidates[0].content.parts[0].text) {
+                        const suggestionsText = result.candidates[0].content.parts[0].text;
+                        const suggestions = suggestionsText.split('\n').filter(s => s.trim() !== '');
+                        displaySuggestions(suggestions, taskName);
+                    } else {
+                        throw new Error("Respuesta inesperada de la API.");
+                    }
+
+                } catch (error) {
+                    console.error("Error al llamar a Gemini API:", error);
+                    modalBody.innerHTML = `<p class="text-red-500">Lo siento, no pude obtener sugerencias. Inténtalo de nuevo más tarde.</p>`;
+                }
+            }
+
+            function displaySuggestions(suggestions, originalTask) {
+                modalBody.innerHTML = `
+                    <p class="mb-1">Sugerencias para:</p>
+                    <p class="font-bold mb-4">"${originalTask}"</p>
+                    <div id="suggestions-list" class="space-y-2">
+                        ${suggestions.map((s, index) => `
+                            <label for="suggestion-${index}" class="flex items-center bg-slate-100 p-3 rounded-lg hover:bg-slate-200 cursor-pointer">
+                                <input type="checkbox" id="suggestion-${index}" checked class="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                <span class="ml-3 text-slate-800">${s}</span>
+                            </label>
+                        `).join('')}
+                    </div>
+                    <button id="add-suggestions-btn" class="w-full mt-6 bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors">
+                        Añadir Tareas Seleccionadas
+                    </button>
+                `;
+
+                document.getElementById('add-suggestions-btn').addEventListener('click', () => {
+                    const checkboxes = document.querySelectorAll('#suggestions-list input[type="checkbox"]');
+                    checkboxes.forEach((cb, index) => {
+                        if (cb.checked) {
+                            addTask(suggestions[index]);
+                        }
+                    });
+                    closeModalBtn.click();
+                });
+            }
         });
     </script>
 </body>
