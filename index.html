@@ -141,7 +141,7 @@
         </div>
     </div>
 
-    <!-- MODAL PARA GEMINI (CORREGIDO) -->
+    <!-- MODAL PARA GEMINI -->
     <div id="gemini-modal" class="modal-overlay hidden fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4">
         <div class="modal-container bg-white w-full md:max-w-md mx-auto rounded-2xl shadow-lg z-50 overflow-y-auto">
             <div class="modal-content text-left p-6">
@@ -180,6 +180,7 @@
         const db = getFirestore(app);
 
         window.addEventListener('DOMContentLoaded', () => {
+            // Referencias a elementos del DOM
             const loginView = document.getElementById('login-view');
             const appView = document.getElementById('app-view');
             const mainContent = document.getElementById('main-content');
@@ -209,6 +210,8 @@
             let sitesUnsubscribe = null;
             let productivityChart = null;
 
+            // ===== Lógica Principal =====
+            
             onAuthStateChanged(auth, (user) => {
                 if (user) {
                     currentUserId = user.uid;
@@ -227,52 +230,94 @@
                 }
             });
             
-            loginForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                loginError.textContent = '';
-                try {
-                    await signInWithEmailAndPassword(auth, loginForm['login-email'].value, loginForm['login-password'].value);
-                } catch (error) {
-                    loginError.textContent = getFirebaseErrorMessage(error);
-                }
-            });
-
-            registerButton.addEventListener('click', async () => {
-                loginError.textContent = '';
-                if (!loginForm['login-email'].value || !loginForm['login-password'].value) {
-                    loginError.textContent = 'Por favor, introduce correo y contraseña.';
-                    return;
-                }
-                try {
-                    await createUserWithEmailAndPassword(auth, loginForm['login-email'].value, loginForm['login-password'].value);
-                } catch (error) {
-                    loginError.textContent = getFirebaseErrorMessage(error);
-                }
-            });
-
-            demoLoginButton.addEventListener('click', async () => {
-                const demoEmail = "demo@enfoqueia.com";
-                const demoPassword = "password123";
-                loginError.textContent = 'Iniciando sesión como usuario de prueba...';
-                try {
-                    await signInWithEmailAndPassword(auth, demoEmail, demoPassword);
-                    loginError.textContent = '';
-                } catch (error) {
-                    if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-                        try {
-                            loginError.textContent = 'Usuario de prueba no encontrado, creándolo...';
-                            await createUserWithEmailAndPassword(auth, demoEmail, demoPassword);
-                            loginError.textContent = '';
-                        } catch (creationError) {
-                            loginError.textContent = 'No se pudo crear el usuario de prueba.';
-                        }
-                    } else {
-                        loginError.textContent = getFirebaseErrorMessage(error);
+            // --- CORRECCIÓN: Añadir listeners con verificaciones de existencia ---
+            if (loginForm) {
+                loginForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    if(loginError) loginError.textContent = '';
+                    try {
+                        await signInWithEmailAndPassword(auth, loginForm['login-email'].value, loginForm['login-password'].value);
+                    } catch (error) {
+                        if(loginError) loginError.textContent = getFirebaseErrorMessage(error);
                     }
-                }
-            });
+                });
+            }
 
-            logoutButton.addEventListener('click', () => signOut(auth));
+            if (registerButton) {
+                registerButton.addEventListener('click', async () => {
+                    if(loginError) loginError.textContent = '';
+                    if (!loginForm['login-email'].value || !loginForm['login-password'].value) {
+                        if(loginError) loginError.textContent = 'Por favor, introduce correo y contraseña.';
+                        return;
+                    }
+                    try {
+                        await createUserWithEmailAndPassword(auth, loginForm['login-email'].value, loginForm['login-password'].value);
+                    } catch (error) {
+                        if(loginError) loginError.textContent = getFirebaseErrorMessage(error);
+                    }
+                });
+            }
+
+            if (demoLoginButton) {
+                demoLoginButton.addEventListener('click', async () => {
+                    const demoEmail = "demo@enfoqueia.com";
+                    const demoPassword = "password123";
+                    if(loginError) loginError.textContent = 'Iniciando sesión como usuario de prueba...';
+                    try {
+                        await signInWithEmailAndPassword(auth, demoEmail, demoPassword);
+                        if(loginError) loginError.textContent = '';
+                    } catch (error) {
+                        if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+                            try {
+                                if(loginError) loginError.textContent = 'Usuario de prueba no encontrado, creándolo...';
+                                await createUserWithEmailAndPassword(auth, demoEmail, demoPassword);
+                                if(loginError) loginError.textContent = '';
+                            } catch (creationError) {
+                                if(loginError) loginError.textContent = 'No se pudo crear el usuario de prueba.';
+                            }
+                        } else {
+                           if(loginError) loginError.textContent = getFirebaseErrorMessage(error);
+                        }
+                    }
+                });
+            }
+
+            if (logoutButton) {
+                logoutButton.addEventListener('click', () => signOut(auth));
+            }
+
+            if (taskForm) {
+                 taskForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    addTask();
+                });
+            }
+            
+            if (siteForm) {
+                siteForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    let siteUrl = siteInput.value.trim();
+                    if (siteUrl && currentUserId) {
+                        try {
+                            const url = new URL(siteUrl.startsWith('http') ? siteUrl : `https://${siteUrl}`);
+                            siteUrl = url.hostname.replace('www.', '');
+                        } catch (_) {
+                            siteUrl = siteUrl.replace('www.', '').split('/')[0];
+                        }
+                        try {
+                            await addDoc(collection(db, "users", currentUserId, "sites"), { url: siteUrl, createdAt: new Date() });
+                            siteInput.value = '';
+                        } catch (error) { console.error("Error al añadir sitio:", error); }
+                    }
+                });
+            }
+
+            if (closeModalBtn) {
+                 closeModalBtn.addEventListener('click', () => {
+                    if(geminiModal) geminiModal.classList.add('hidden');
+                    if(document.body) document.body.classList.remove('modal-active');
+                });
+            }
             
             function getFirebaseErrorMessage(error) {
                 switch (error.code) {
@@ -285,20 +330,22 @@
             }
 
             function loadUserData(userId) {
-                appNotification.innerHTML = '';
-                mainContent.classList.remove('hidden');
-                userIdContainer.classList.remove('hidden');
+                if (appNotification) appNotification.innerHTML = '';
+                if (mainContent) mainContent.classList.remove('hidden');
+                if (userIdContainer) userIdContainer.classList.remove('hidden');
 
                 const handleFirestoreError = (error) => {
                     console.error("Error en listener de Firestore:", error);
-                    mainContent.classList.add('hidden');
-                    userIdContainer.classList.add('hidden');
-                    if (error.code === 'permission-denied') {
-                        appNotification.innerHTML = `<div class='bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg' role='alert'><p class='font-bold'>Error de Permisos</p><p>Revisa las reglas de seguridad de Firestore en tu Consola de Firebase.</p></div>`;
-                    } else if (error.code === 'failed-precondition') {
-                        appNotification.innerHTML = `<div class='bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-lg' role='alert'><p class='font-bold'>Acción Requerida: Crear Índice en Firebase</p><p>La base de datos necesita un índice para ordenar tus tareas. Por favor, sigue estos pasos:</p><ol class="list-decimal list-inside mt-2 text-sm"><li>Abre la consola de tu navegador (clic derecho > Inspeccionar > Console).</li><li>Busca un mensaje de error de Firestore que contenga un enlace largo.</li><li>Haz clic en ese enlace. Te llevará directamente a la página de creación de índices en tu Consola de Firebase con toda la información ya rellenada.</li><li>Haz clic en <strong>"Crear índice"</strong> y espera unos minutos a que se construya.</li><li>Una vez creado, recarga esta página.</li></ol></div>`;
-                    } else {
-                        appNotification.innerHTML = `<div class='bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg' role='alert'><p class='font-bold'>Ocurrió un Error Inesperado</p><p>No se pudieron cargar los datos. Revisa la consola del navegador para más detalles. Código de error: ${error.code}</p></div>`;
+                    if (mainContent) mainContent.classList.add('hidden');
+                    if (userIdContainer) userIdContainer.classList.add('hidden');
+                    if (appNotification) {
+                        if (error.code === 'permission-denied') {
+                            appNotification.innerHTML = `<div class='bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg' role='alert'><p class='font-bold'>Error de Permisos</p><p>Revisa las reglas de seguridad de Firestore en tu Consola de Firebase.</p></div>`;
+                        } else if (error.code === 'failed-precondition') {
+                            appNotification.innerHTML = `<div class='bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-lg' role='alert'><p class='font-bold'>Acción Requerida: Crear Índice en Firebase</p><p>La base de datos necesita un índice para ordenar tus tareas. Por favor, sigue estos pasos:</p><ol class="list-decimal list-inside mt-2 text-sm"><li>Abre la consola de tu navegador (clic derecho > Inspeccionar > Console).</li><li>Busca un mensaje de error de Firestore que contenga un enlace largo.</li><li>Haz clic en ese enlace. Te llevará directamente a la página de creación de índices en tu Consola de Firebase con toda la información ya rellenada.</li><li>Haz clic en <strong>"Crear índice"</strong> y espera unos minutos a que se construya.</li><li>Una vez creado, recarga esta página.</li></ol></div>`;
+                        } else {
+                            appNotification.innerHTML = `<div class='bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg' role='alert'><p class='font-bold'>Ocurrió un Error Inesperado</p><p>No se pudieron cargar los datos. Revisa la consola del navegador para más detalles. Código de error: ${error.code}</p></div>`;
+                        }
                     }
                 };
 
@@ -306,9 +353,11 @@
                 
                 const pendingTasksQuery = query(tasksRef, where("completed", "==", false), orderBy("createdAt", "asc"));
                 tasksUnsubscribe = onSnapshot(pendingTasksQuery, snapshot => {
-                    taskList.innerHTML = '';
-                    if (snapshot.empty) taskList.innerHTML = `<li class="text-slate-400 text-sm text-center py-2">¡Añade un nuevo objetivo para empezar!</li>`;
-                    snapshot.forEach(doc => renderTask(doc.id, doc.data()));
+                    if(taskList) {
+                        taskList.innerHTML = '';
+                        if (snapshot.empty) taskList.innerHTML = `<li class="text-slate-400 text-sm text-center py-2">¡Añade un nuevo objetivo para empezar!</li>`;
+                        snapshot.forEach(doc => renderTask(doc.id, doc.data()));
+                    }
                 }, handleFirestoreError);
                 
                 const sevenDaysAgo = new Date();
@@ -317,30 +366,31 @@
                 const completedTasksQuery = query(tasksRef, where("completed", "==", true), where("completedAt", ">=", Timestamp.fromDate(sevenDaysAgo)));
                 completedTasksUnsubscribe = onSnapshot(completedTasksQuery, snapshot => {
                     const completedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    completedTaskList.innerHTML = '';
-                    if (completedTasks.length === 0) {
-                        completedTaskList.innerHTML = `<li class="text-slate-400 text-sm text-center py-2">Aún no has completado ningún objetivo.</li>`;
-                    } else {
-                        completedTasks.sort((a,b) => b.completedAt.seconds - a.completedAt.seconds);
-                        completedTasks.forEach(task => renderCompletedTask(task.id, task));
+                    if(completedTaskList) {
+                        completedTaskList.innerHTML = '';
+                        if (completedTasks.length === 0) {
+                            completedTaskList.innerHTML = `<li class="text-slate-400 text-sm text-center py-2">Aún no has completado ningún objetivo.</li>`;
+                        } else {
+                            completedTasks.sort((a,b) => b.completedAt.seconds - a.completedAt.seconds);
+                            completedTasks.forEach(task => renderCompletedTask(task.id, task));
+                        }
                     }
                     updateProductivityChart(completedTasks);
                 }, handleFirestoreError);
 
                 const sitesRef = collection(db, "users", userId, "sites");
                 sitesUnsubscribe = onSnapshot(sitesRef, snapshot => {
-                    siteList.innerHTML = '';
-                    if (snapshot.empty) siteList.innerHTML = `<li class="text-slate-400 text-sm text-center py-2">Añade un sitio que te distraiga.</li>`;
-                    snapshot.forEach(doc => renderSite(doc.id, doc.data()));
+                    if(siteList) {
+                        siteList.innerHTML = '';
+                        if (snapshot.empty) siteList.innerHTML = `<li class="text-slate-400 text-sm text-center py-2">Añade un sitio que te distraiga.</li>`;
+                        snapshot.forEach(doc => renderSite(doc.id, doc.data()));
+                    }
                 }, handleFirestoreError);
             }
 
             function updateProductivityChart(tasks) {
                 const chartContainer = document.getElementById('productivityChart');
-                if (!chartContainer) {
-                    console.error("El elemento canvas para la gráfica no se encontró.");
-                    return;
-                }
+                if (!chartContainer) return;
                 const ctx = chartContainer.getContext('2d');
                 
                 const labels = [];
@@ -357,19 +407,15 @@
                     const completedDate = task.completedAt.toDate();
                     const today = new Date();
                     today.setHours(23, 59, 59, 999);
-                    
                     const diffTime = today - completedDate;
                     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                    
                     if (diffDays >= 0 && diffDays < 7) {
                         const dayIndex = 6 - diffDays;
                         data[dayIndex]++;
                     }
                 });
 
-                if (productivityChart) {
-                    productivityChart.destroy();
-                }
+                if (productivityChart) productivityChart.destroy();
 
                 productivityChart = new Chart(ctx, {
                     type: 'bar',
@@ -387,31 +433,14 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                ticks: {
-                                    stepSize: 1,
-                                    callback: function(value) {if (value % 1 === 0) {return value;}}
-                                }
-                            }
-                        },
-                        plugins: {
-                            legend: {
-                                display: false
-                            }
-                        }
+                        scales: { y: { beginAtZero: true, ticks: { stepSize: 1, callback: function(value) {if (value % 1 === 0) {return value;}} } } },
+                        plugins: { legend: { display: false } }
                     }
                 });
             }
 
-            taskForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                addTask();
-            });
-
             async function addTask(taskNameOverride = null) {
-                const taskName = taskNameOverride || taskInput.value.trim();
+                const taskName = (taskNameOverride || (taskInput ? taskInput.value : "")).trim();
                 if (taskName && currentUserId) {
                     try {
                         await addDoc(collection(db, "users", currentUserId, "tasks"), {
@@ -419,28 +448,11 @@
                             completed: false,
                             createdAt: new Date()
                         });
-                        if (!taskNameOverride) taskInput.value = '';
+                        if (!taskNameOverride && taskInput) taskInput.value = '';
                     } catch (error) { console.error("Error al añadir tarea:", error); }
                 }
             }
-
-            siteForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                let siteUrl = siteInput.value.trim();
-                if (siteUrl && currentUserId) {
-                    try {
-                        const url = new URL(siteUrl.startsWith('http') ? siteUrl : `https://${siteUrl}`);
-                        siteUrl = url.hostname.replace('www.', '');
-                    } catch (_) {
-                        siteUrl = siteUrl.replace('www.', '').split('/')[0];
-                    }
-                    try {
-                        await addDoc(collection(db, "users", currentUserId, "sites"), { url: siteUrl, createdAt: new Date() });
-                        siteInput.value = '';
-                    } catch (error) { console.error("Error al añadir sitio:", error); }
-                }
-            });
-
+            
             async function completeTask(taskId) {
                 if (!currentUserId || !taskId) return;
                 const taskRef = doc(db, "users", currentUserId, "tasks", taskId);
@@ -474,64 +486,60 @@
                         </button>
                     </div>
                 `;
-                taskList.appendChild(li);
-                li.querySelector('.complete-task-btn').addEventListener('click', e => completeTask(e.currentTarget.dataset.id));
-                li.querySelector('.delete-task-btn').addEventListener('click', e => deleteTask(e.currentTarget.dataset.id));
-                li.querySelector('.gemini-btn').addEventListener('click', e => showGeminiModal(e.currentTarget.dataset.taskName));
+                if(taskList) {
+                    taskList.appendChild(li);
+                    li.querySelector('.complete-task-btn')?.addEventListener('click', e => completeTask(e.currentTarget.dataset.id));
+                    li.querySelector('.delete-task-btn')?.addEventListener('click', e => deleteTask(e.currentTarget.dataset.id));
+                    li.querySelector('.gemini-btn')?.addEventListener('click', e => showGeminiModal(e.currentTarget.dataset.taskName));
+                }
             }
             
             function renderCompletedTask(id, data) {
                 const li = document.createElement('li');
                 li.className = 'flex items-center bg-slate-100 p-3 rounded-lg task-completed';
                 li.innerHTML = `<span>${data.name}</span>`;
-                completedTaskList.appendChild(li);
+                if(completedTaskList) completedTaskList.appendChild(li);
             }
 
             function renderSite(id, data) {
                 const li = document.createElement('li');
                 li.className = 'flex items-center justify-between bg-slate-100 p-3 rounded-lg';
                 li.innerHTML = `<span class="flex-grow font-mono text-sm">${data.url}</span><button data-id="${id}" class="delete-site-btn text-slate-400 hover:text-red-500 transition-colors p-1"><i class="ph ph-trash"></i></button>`;
-                siteList.appendChild(li);
-                li.querySelector('.delete-site-btn').addEventListener('click', async (e) => {
-                    const docId = e.currentTarget.dataset.id;
-                    await deleteDoc(doc(db, "users", currentUserId, "sites", docId));
-                });
+                if(siteList) {
+                    siteList.appendChild(li);
+                    li.querySelector('.delete-site-btn')?.addEventListener('click', async (e) => {
+                        const docId = e.currentTarget.dataset.id;
+                        await deleteDoc(doc(db, "users", currentUserId, "sites", docId));
+                    });
+                }
             }
 
             function showGeminiModal(taskName) {
-                geminiModal.classList.remove('hidden');
-                document.body.classList.add('modal-active');
-                modalBody.innerHTML = `
-                    <p class="mb-2">Analizando cómo desglosar: "<strong>${taskName}</strong>"</p>
-                    <div class="flex items-center justify-center py-4">
-                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
-                    </div>
-                `;
+                if(geminiModal) geminiModal.classList.remove('hidden');
+                if(document.body) document.body.classList.add('modal-active');
+                if(modalBody) {
+                    modalBody.innerHTML = `
+                        <p class="mb-2">Analizando cómo desglosar: "<strong>${taskName}</strong>"</p>
+                        <div class="flex items-center justify-center py-4">
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
+                        </div>
+                    `;
+                }
                 getTaskBreakdown(taskName);
             }
             
-            closeModalBtn.addEventListener('click', () => {
-                geminiModal.classList.add('hidden');
-                document.body.classList.remove('modal-active');
-            });
-
             async function getTaskBreakdown(taskName) {
                 const prompt = `Desglosa el siguiente objetivo en 3 a 5 sub-tareas o pasos concretos y accionables. Responde únicamente con la lista de sub-tareas, cada una en una nueva línea, sin numeración ni guiones. Objetivo: "${taskName}"`;
-                
-                const apiKey = ""; // Canvas lo proporciona en runtime
+                const apiKey = "";
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-
                 try {
                     const response = await fetch(apiUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
                     });
-                    
                     if (!response.ok) throw new Error(`API error: ${response.statusText}`);
-
                     const result = await response.json();
-                    
                     if (result.candidates && result.candidates[0].content.parts[0].text) {
                         const suggestionsText = result.candidates[0].content.parts[0].text;
                         const suggestions = suggestionsText.split('\n').filter(s => s.trim() !== '');
@@ -539,39 +547,43 @@
                     } else {
                         throw new Error("Respuesta inesperada de la API.");
                     }
-
                 } catch (error) {
                     console.error("Error al llamar a Gemini API:", error);
-                    modalBody.innerHTML = `<p class="text-red-500">Lo siento, no pude obtener sugerencias. Inténtalo de nuevo más tarde.</p>`;
+                    if(modalBody) modalBody.innerHTML = `<p class="text-red-500">Lo siento, no pude obtener sugerencias. Inténtalo de nuevo más tarde.</p>`;
                 }
             }
 
             function displaySuggestions(suggestions, originalTask) {
-                modalBody.innerHTML = `
-                    <p class="mb-1">Sugerencias para:</p>
-                    <p class="font-bold mb-4">"${originalTask}"</p>
-                    <div id="suggestions-list" class="space-y-2">
-                        ${suggestions.map((s, index) => `
-                            <label for="suggestion-${index}" class="flex items-center bg-slate-100 p-3 rounded-lg hover:bg-slate-200 cursor-pointer">
-                                <input type="checkbox" id="suggestion-${index}" checked class="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                                <span class="ml-3 text-slate-800">${s}</span>
-                            </label>
-                        `).join('')}
-                    </div>
-                    <button id="add-suggestions-btn" class="w-full mt-6 bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors">
-                        Añadir Tareas Seleccionadas
-                    </button>
-                `;
+                if(modalBody) {
+                    modalBody.innerHTML = `
+                        <p class="mb-1">Sugerencias para:</p>
+                        <p class="font-bold mb-4">"${originalTask}"</p>
+                        <div id="suggestions-list" class="space-y-2">
+                            ${suggestions.map((s, index) => `
+                                <label for="suggestion-${index}" class="flex items-center bg-slate-100 p-3 rounded-lg hover:bg-slate-200 cursor-pointer">
+                                    <input type="checkbox" id="suggestion-${index}" checked class="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                    <span class="ml-3 text-slate-800">${s}</span>
+                                </label>
+                            `).join('')}
+                        </div>
+                        <button id="add-suggestions-btn" class="w-full mt-6 bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors">
+                            Añadir Tareas Seleccionadas
+                        </button>
+                    `;
 
-                document.getElementById('add-suggestions-btn').addEventListener('click', () => {
-                    const checkboxes = document.querySelectorAll('#suggestions-list input[type="checkbox"]');
-                    checkboxes.forEach((cb, index) => {
-                        if (cb.checked) {
-                            addTask(suggestions[index]);
-                        }
-                    });
-                    closeModalBtn.click();
-                });
+                    const addSuggestionsBtn = document.getElementById('add-suggestions-btn');
+                    if (addSuggestionsBtn) {
+                        addSuggestionsBtn.addEventListener('click', () => {
+                            const checkboxes = document.querySelectorAll('#suggestions-list input[type="checkbox"]');
+                            checkboxes.forEach((cb, index) => {
+                                if (cb.checked) {
+                                    addTask(suggestions[index]);
+                                }
+                            });
+                            if(closeModalBtn) closeModalBtn.click();
+                        });
+                    }
+                }
             }
 
         });
