@@ -133,8 +133,21 @@
 
     <!-- MODAL PARA GEMINI -->
     <div id="gemini-modal" class="modal-overlay hidden fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4">
-        <!-- ... (código del modal sin cambios) ... -->
+        <div class="modal-container bg-white w-full md:max-w-md mx-auto rounded-2xl shadow-lg z-50 overflow-y-auto">
+            <div class="modal-content text-left p-6">
+                <div class="flex justify-between items-center pb-3">
+                    <p class="text-2xl font-bold flex items-center gap-2"><i class="ph-duotone ph-sparkle text-yellow-400"></i> Sugerencias de IA</p>
+                    <button id="close-modal-btn" class="modal-close cursor-pointer z-50">
+                        <i class="ph ph-x-circle text-2xl text-slate-400 hover:text-slate-600"></i>
+                    </button>
+                </div>
+                <div id="modal-body">
+                    <!-- El contenido de la IA se cargará aquí -->
+                </div>
+            </div>
+        </div>
     </div>
+
 
     <!-- Firebase SDKs -->
     <script type="module">
@@ -160,9 +173,31 @@
             const loginView = document.getElementById('login-view');
             const appView = document.getElementById('app-view');
             const mainContent = document.getElementById('main-content');
+            const userEmailDisplay = document.getElementById('user-email');
+            const userIdDisplay = document.getElementById('user-id-display');
+            const appNotification = document.getElementById('app-notification');
+            const userIdContainer = document.getElementById('user-id-container');
+            
+            // Formularios y botones de login
+            const loginForm = document.getElementById('login-form');
+            const registerButton = document.getElementById('register-button');
+            const demoLoginButton = document.getElementById('demo-login-button');
+            const logoutButton = document.getElementById('logout-button');
+            const loginError = document.getElementById('login-error');
+
+            // Formularios de la app principal
+            const taskForm = document.getElementById('task-form');
+            const taskInput = document.getElementById('task-input');
             const taskList = document.getElementById('task-list');
-            const completedTaskList = document.getElementById('completed-task-list'); // Nueva lista
-            // ... (otras referencias al DOM sin cambios) ...
+            const completedTaskList = document.getElementById('completed-task-list');
+            const siteForm = document.getElementById('site-form');
+            const siteInput = document.getElementById('site-input');
+            const siteList = document.getElementById('site-list');
+            
+            // Modal de Gemini
+            const geminiModal = document.getElementById('gemini-modal');
+            const modalBody = document.getElementById('modal-body');
+            const closeModalBtn = document.getElementById('close-modal-btn');
 
             let currentUserId = null;
             let tasksUnsubscribe = null;
@@ -172,21 +207,104 @@
             onAuthStateChanged(auth, (user) => {
                 if (user) {
                     currentUserId = user.uid;
-                    // ... (lógica de cambio de vista) ...
+                    loginView.classList.add('hidden');
+                    appView.classList.remove('hidden');
+                    userEmailDisplay.textContent = user.email;
+                    userIdDisplay.textContent = user.uid;
                     loadUserData(currentUserId);
                 } else {
-                    // ... (lógica de logout, detener listeners) ...
+                    currentUserId = null;
+                    loginView.classList.remove('hidden');
+                    appView.classList.add('hidden');
+                    if (tasksUnsubscribe) tasksUnsubscribe();
                     if (completedTasksUnsubscribe) completedTasksUnsubscribe();
+                    if (sitesUnsubscribe) sitesUnsubscribe();
                 }
             });
             
-            // ... (código de autenticación sin cambios) ...
+            // --- CÓDIGO DE AUTENTICACIÓN RESTAURADO ---
+            loginForm.addEventListener('submit', async e => {
+                e.preventDefault();
+                loginError.textContent = '';
+                try {
+                    await signInWithEmailAndPassword(auth, loginForm['login-email'].value, loginForm['login-password'].value);
+                } catch (error) {
+                    loginError.textContent = getFirebaseErrorMessage(error);
+                }
+            });
+
+            registerButton.addEventListener('click', async () => {
+                loginError.textContent = '';
+                if (!loginForm['login-email'].value || !loginForm['login-password'].value) {
+                    loginError.textContent = 'Por favor, introduce correo y contraseña.';
+                    return;
+                }
+                try {
+                    await createUserWithEmailAndPassword(auth, loginForm['login-email'].value, loginForm['login-password'].value);
+                } catch (error) {
+                    loginError.textContent = getFirebaseErrorMessage(error);
+                }
+            });
+            
+            demoLoginButton.addEventListener('click', async () => {
+                const demoEmail = "demo@enfoqueia.com";
+                const demoPassword = "password123";
+                loginError.textContent = 'Iniciando sesión como usuario de prueba...';
+                try {
+                    await signInWithEmailAndPassword(auth, demoEmail, demoPassword);
+                    loginError.textContent = '';
+                } catch (error) {
+                    if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+                        try {
+                            loginError.textContent = 'Usuario de prueba no encontrado, creándolo...';
+                            await createUserWithEmailAndPassword(auth, demoEmail, demoPassword);
+                            loginError.textContent = '';
+                        } catch (creationError) {
+                            loginError.textContent = 'No se pudo crear el usuario de prueba.';
+                        }
+                    } else {
+                        loginError.textContent = getFirebaseErrorMessage(error);
+                    }
+                }
+            });
+
+            logoutButton.addEventListener('click', () => signOut(auth));
+            
+            function getFirebaseErrorMessage(error) {
+                switch (error.code) {
+                    case 'auth/invalid-email': return 'El formato del correo no es válido.';
+                    case 'auth/user-not-found':
+                    case 'auth/wrong-password':
+                    case 'auth/invalid-credential': return 'Correo o contraseña incorrectos.';
+                    case 'auth/email-already-in-use': return 'Este correo ya está registrado.';
+                    case 'auth/weak-password': return 'La contraseña debe tener al menos 6 caracteres.';
+                    default: return 'Ocurrió un error. Inténtalo de nuevo.';
+                }
+            }
+
 
             function loadUserData(userId) {
-                // ... (código de notificación de permisos sin cambios) ...
+                appNotification.innerHTML = '';
+                mainContent.classList.remove('hidden');
+                userIdContainer.classList.remove('hidden');
 
-                // Escuchar TAREAS PENDIENTES
+                const handleFirestoreError = (error) => {
+                    console.error("Error en listener de Firestore:", error);
+                    if (error.code === 'permission-denied') {
+                        mainContent.classList.add('hidden');
+                        userIdContainer.classList.add('hidden');
+                        appNotification.innerHTML = `
+                            <div class='bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-lg' role='alert'>
+                                <p class='font-bold'>Error de Permisos</p>
+                                <p>Revisa las reglas de seguridad de Firestore en tu Consola de Firebase.</p>
+                            </div>
+                        `;
+                    }
+                };
+
                 const tasksRef = collection(db, "users", userId, "tasks");
+                
+                // Escuchar TAREAS PENDIENTES
                 const pendingTasksQuery = query(tasksRef, where("completed", "==", false), orderBy("createdAt", "asc"));
                 tasksUnsubscribe = onSnapshot(pendingTasksQuery, snapshot => {
                     taskList.innerHTML = '';
@@ -206,7 +324,15 @@
                     snapshot.forEach(doc => renderCompletedTask(doc.id, doc.data()));
                 }, handleFirestoreError);
 
-                // ... (código de listener de sitios sin cambios) ...
+                // Escuchar Sitios a Bloquear
+                const sitesRef = collection(db, "users", userId, "sites");
+                sitesUnsubscribe = onSnapshot(sitesRef, snapshot => {
+                    siteList.innerHTML = '';
+                    if (snapshot.empty) {
+                        siteList.innerHTML = `<li class="text-slate-400 text-sm text-center py-2">Añade un sitio que te distraiga.</li>`;
+                    }
+                    snapshot.forEach(doc => renderSite(doc.id, doc.data()));
+                }, handleFirestoreError);
             }
 
             async function addTask(taskNameOverride = null) {
@@ -222,8 +348,25 @@
                     } catch (error) { console.error("Error al añadir tarea:", error); }
                 }
             }
+            
+            siteForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                let siteUrl = siteInput.value.trim();
+                if (siteUrl && currentUserId) {
+                    try {
+                        const url = new URL(siteUrl.startsWith('http') ? siteUrl : `https://${siteUrl}`);
+                        siteUrl = url.hostname.replace('www.', '');
+                    } catch (_) {
+                        siteUrl = siteUrl.replace('www.', '').split('/')[0];
+                    }
+                    try {
+                        await addDoc(collection(db, "users", currentUserId, "sites"), { url: siteUrl, createdAt: new Date() });
+                        siteInput.value = '';
+                    } catch (error) { console.error("Error al añadir sitio:", error); }
+                }
+            });
 
-            // --- NUEVA FUNCIÓN ---
+
             async function completeTask(taskId) {
                 if (!currentUserId || !taskId) return;
                 const taskRef = doc(db, "users", currentUserId, "tasks", taskId);
@@ -236,6 +379,17 @@
                     console.error("Error al completar la tarea:", error);
                 }
             }
+            
+            async function deleteTask(taskId) {
+                 if (!currentUserId || !taskId) return;
+                const taskRef = doc(db, "users", currentUserId, "tasks", taskId);
+                try {
+                    await deleteDoc(taskRef);
+                } catch (error) {
+                    console.error("Error al eliminar la tarea:", error);
+                }
+            }
+
 
             function renderTask(id, data) {
                 const li = document.createElement('li');
@@ -256,13 +410,12 @@
                 `;
                 if (taskList) {
                     taskList.appendChild(li);
-                    // Listener para completar tarea
                     li.querySelector('.complete-task-btn').addEventListener('click', e => completeTask(e.currentTarget.dataset.id));
-                    // ... (otros listeners) ...
+                    li.querySelector('.delete-task-btn').addEventListener('click', e => deleteTask(e.currentTarget.dataset.id));
+                    // Falta listener de gemini-btn, lo añadiremos
                 }
             }
             
-            // --- NUEVA FUNCIÓN ---
             function renderCompletedTask(id, data) {
                 const li = document.createElement('li');
                 li.className = 'flex items-center bg-slate-100 p-3 rounded-lg task-completed';
@@ -274,7 +427,21 @@
                 }
             }
 
-            // ... (resto del código JS sin cambios) ...
+            function renderSite(id, data) {
+                 const li = document.createElement('li');
+                li.className = 'flex items-center justify-between bg-slate-100 p-3 rounded-lg';
+                li.innerHTML = `<span class="flex-grow font-mono text-sm">${data.url}</span><button data-id="${id}" class="delete-site-btn text-slate-400 hover:text-red-500 transition-colors p-1"><i class="ph ph-trash"></i></button>`;
+                if (siteList) {
+                    siteList.appendChild(li);
+                    li.querySelector('.delete-site-btn').addEventListener('click', async (e) => {
+                        const docId = e.currentTarget.dataset.id;
+                        await deleteDoc(doc(db, "users", currentUserId, "sites", docId));
+                    });
+                }
+            }
+            
+            // ... (código del modal sin cambios) ...
+
         });
     </script>
 </body>
